@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dynamic Capabilities — Dimensional Scoring & Gap Analysis</title>
+<style>
+  :root {
+    --cbdc-color: #1a3a52;
+    --stable-color: #d97706;
+    --bg-color: #f7f5f0;
+    --card-bg: #ffffff;
+    --text-main: #1a2332;
+    --text-muted: #6b7280;
+    --border-color: #e5e7eb;
+    --track-bg: #d1d5db;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg-color);
+    color: var(--text-main);
+    padding: 24px;
+    line-height: 1.5;
+    user-select: none;
+  }
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--cbdc-color);
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+  h2 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-main);
+    border-bottom: 2px solid var(--cbdc-color);
+    padding-bottom: 8px;
+    display: inline-block;
+    margin-bottom: 24px;
+  }
+  .legend {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .dot-sample {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .cbdc-dot { background: var(--cbdc-color); }
+  .stable-dot { background: var(--stable-color); }
+
+  .panel {
+    background: var(--card-bg);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid var(--border-color);
+    margin-bottom: 20px;
+  }
+
+  .weights-section { margin-bottom: 16px; }
+  .weights-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+  .weights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .weight-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .weight-field label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .weight-field input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-main);
+    text-align: center;
+  }
+  .weight-field input:focus {
+    outline: none;
+    border-color: var(--cbdc-color);
+    box-shadow: 0 0 0 3px rgba(26,58,82,0.1);
+  }
+
+  .dimension-block {
+    padding: 18px 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .dimension-block:last-child { border-bottom: none; }
+
+  .dim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .dim-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-main);
+  }
+  .dim-values {
+    display: flex;
+    gap: 16px;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+  .dim-values .cbdc-val { color: var(--cbdc-color); }
+  .dim-values .stable-val { color: var(--stable-color); }
+  .dim-values .gap-val { color: #7c3aed; }
+
+  .track-wrap {
+    position: relative;
+    height: 48px;
+    margin-left: 0;
+  }
+  .track-bg {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%; transform: translateY(-50%);
+    height: 8px;
+    background: var(--track-bg);
+    border-radius: 4px;
+  }
+  .tick {
+    position: absolute;
+    top: -4px;
+    width: 1px;
+    height: 16px;
+    background: #9ca3af;
+  }
+  .tick-label {
+    position: absolute;
+    top: 18px;
+    transform: translateX(-50%);
+    font-size: 0.65rem;
+    color: #9ca3af;
+    font-weight: 600;
+  }
+  .gap-bridge {
+    position: absolute;
+    height: 4px;
+    top: 50%; transform: translateY(-50%);
+    background: linear-gradient(90deg, var(--cbdc-color), var(--stable-color));
+    border-radius: 2px;
+    opacity: 0.5;
+    pointer-events: none;
+    transition: left 0.1s, width 0.1s;
+  }
+  .marker {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    top: 50%; transform: translate(-50%, -50%);
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    cursor: grab;
+    z-index: 5;
+    touch-action: none;
+  }
+  .marker:active { cursor: grabbing; }
+  .marker-cbdc { background: var(--cbdc-color); }
+  .marker-stable { background: var(--stable-color); }
+  .marker-label {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.75rem;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+    background: rgba(255,255,255,0.9);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .marker-cbdc .marker-label { bottom: 28px; color: var(--cbdc-color); }
+  .marker-stable .marker-label { top: 28px; color: var(--stable-color); }
+
+  /* Summary metric tracks */
+  .summary-panel {
+    background: var(--card-bg);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid var(--border-color);
+    margin-bottom: 20px;
+  }
+  .summary-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 16px;
+  }
+  .summary-row {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    text-align: right;
+    padding-right: 8px;
+  }
+  .summary-track-wrap {
+    position: relative;
+    height: 40px;
+  }
+  .summary-track-bg {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%; transform: translateY(-50%);
+    height: 8px;
+    background: var(--track-bg);
+    border-radius: 4px;
+  }
+  .summary-tick {
+    position: absolute;
+    top: -4px;
+    width: 1px;
+    height: 16px;
+    background: #9ca3af;
+  }
+  .summary-tick-label {
+    position: absolute;
+    top: 16px;
+    transform: translateX(-50%);
+    font-size: 0.6rem;
+    color: #9ca3af;
+    font-weight: 600;
+  }
+  .summary-marker {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    top: 50%; transform: translate(-50%, -50%);
+    border: 3px solid #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    z-index: 3;
+    transition: left 0.3s ease;
+  }
+  .summary-marker-label {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+    background: rgba(255,255,255,0.95);
+    padding: 1px 5px;
+    border-radius: 4px;
+    bottom: 24px;
+  }
+  .sm-cbdc { background: var(--cbdc-color); }
+  .sm-stable { background: var(--stable-color); }
+  .sm-gap { background: #7c3aed; }
+  .sm-avg { background: #059669; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-top: 20px;
+  }
+  .stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 18px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .stat-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+  .stat-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  @media (max-width: 600px) {
+    .dim-header { flex-direction: column; align-items: flex-start; }
+    .summary-row { grid-template-columns: 1fr; }
+    .summary-label { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Dynamic Capabilities</h1>
+  <h2>Dimensional Scoring & Gap Analysis</h2>
+
+  <div class="legend">
+    <div class="legend-item">
+      <div class="dot-sample cbdc-dot"></div>
+      <span>CBDC (Sovereign Money)</span>
+    </div>
+    <div class="legend-item">
+      <div class="dot-sample stable-dot"></div>
+      <span>Stablecoin (Private Money)</span>
+    </div>
+  </div>
+
+  <div class="panel weights-section">
+    <div class="weights-title">Dimension Weights (edit below — default = 1.0 each)</div>
+    <div class="weights-grid" id="weights-grid"></div>
+  </div>
+
+  <div class="panel" id="chart-panel"></div>
+
+  <!-- Summary Metrics Visual Tracks -->
+  <div class="summary-panel" id="summary-panel"></div>
+
+  <div class="stats-grid" id="stats-grid"></div>
+</div>
+
+<script>
+  // ============================
+  // CONFIGURATION
+  // ============================
+  const dimensions = [
+    { name: "Financial Inclusion",          cbdc: 7, stable: 9, weight: 1.0 },
+    { name: "Monetary Policy Efficacy",     cbdc: 10, stable: 3, weight: 1.0 },
+    { name: "Privacy Preservation",         cbdc: 4, stable: 6, weight: 1.0 },
+    { name: "Cross-Border Efficiency",      cbdc: 6, stable: 8, weight: 1.0 },
+    { name: "Systemic Risk Containment",    cbdc: 9, stable: 5, weight: 1.0 },
+    { name: "Innovation & Composability",   cbdc: 5, stable: 10, weight: 1.0 }
+  ];
+
+  let dragState = null;
+
+  // ============================
+  // WEIGHTS
+  // ============================
+  function renderWeights() {
+    const grid = document.getElementById('weights-grid');
+    grid.innerHTML = '';
+    dimensions.forEach((dim, idx) => {
+      const div = document.createElement('div');
+      div.className = 'weight-field';
+      div.innerHTML = `
+        <label>${dim.name}</label>
+        <input type="number" step="0.1" min="0" max="10" value="${dim.weight.toFixed(1)}"
+          onchange="updateWeight(${idx}, this.value)">
+      `;
+      grid.appendChild(div);
+    });
+  }
+  function updateWeight(idx, val) {
+    let w = parseFloat(val);
+    if (isNaN(w) || w < 0) w = 0;
+    dimensions[idx].weight = w;
+    renderAll();
+  }
+
+  // ============================
+  // CHART PANEL
+  // ============================
+  function renderChartPanel() {
+    const panel = document.getElementById('chart-panel');
+    panel.innerHTML = '';
+
+    dimensions.forEach((dim, idx) => {
+      const block = document.createElement('div');
+      block.className = 'dimension-block';
+
+      const header = document.createElement('div');
+      header.className = 'dim-header';
+      const gap = Math.abs(dim.cbdc - dim.stable);
+      const wGap = (gap * dim.weight).toFixed(1);
+      header.innerHTML = `
+        <span class="dim-name">${dim.name}</span>
+        <span class="dim-values">
+          <span class="cbdc-val">CBDC: ${dim.cbdc}</span>
+          <span class="stable-val">Stable: ${dim.stable}</span>
+          <span class="gap-val">Gap: ${gap} (w: ${wGap})</span>
+        </span>
+      `;
+      block.appendChild(header);
+
+      const trackWrap = document.createElement('div');
+      trackWrap.className = 'track-wrap';
+      trackWrap.id = `track-wrap-${idx}`;
+
+      let trackHTML = '<div class="track-bg" id="track-bg-' + idx + '">';
+      for (let i = 1; i <= 10; i++) {
+        const pct = ((i - 1) / 9) * 100;
+        trackHTML += `<div class="tick" style="left:${pct}%"></div>`;
+        trackHTML += `<div class="tick-label" style="left:${pct}%">${i}</div>`;
+      }
+      trackHTML += '</div>';
+      trackWrap.innerHTML = trackHTML;
+
+      const minV = Math.min(dim.cbdc, dim.stable);
+      const maxV = Math.max(dim.cbdc, dim.stable);
+      const diff = maxV - minV;
+      if (diff > 0) {
+        const bridge = document.createElement('div');
+        bridge.className = 'gap-bridge';
+        bridge.id = `bridge-${idx}`;
+        bridge.style.left = (((minV - 1) / 9) * 100) + '%';
+        bridge.style.width = ((diff / 9) * 100) + '%';
+        trackWrap.appendChild(bridge);
+      }
+
+      trackWrap.appendChild(createMarker(idx, 'cbdc', dim.cbdc));
+      trackWrap.appendChild(createMarker(idx, 'stable', dim.stable));
+
+      block.appendChild(trackWrap);
+      panel.appendChild(block);
+    });
+  }
+
+  function createMarker(idx, type, value) {
+    const marker = document.createElement('div');
+    marker.className = `marker marker-${type}`;
+    marker.id = `marker-${type}-${idx}`;
+    marker.style.left = (((value - 1) / 9) * 100) + '%';
+    marker.dataset.idx = idx;
+    marker.dataset.type = type;
+
+    const label = document.createElement('span');
+    label.className = 'marker-label';
+    label.id = `marker-label-${type}-${idx}`;
+    label.textContent = type === 'cbdc' ? `CBDC (${value})` : `Stablecoin (${value})`;
+    marker.appendChild(label);
+
+    marker.addEventListener('mousedown', (e) => startDrag(e, idx, type));
+    marker.addEventListener('touchstart', (e) => startDrag(e, idx, type), {passive: false});
+
+    return marker;
+  }
+
+  // ============================
+  // DRAG LOGIC
+  // ============================
+  function startDrag(e, idx, type) {
+    e.preventDefault();
+    dragState = { idx, type };
+    const marker = document.getElementById(`marker-${type}-${idx}`);
+    if (marker) marker.style.cursor = 'grabbing';
+  }
+
+  function handleMove(clientX) {
+    if (!dragState) return;
+    const { idx, type } = dragState;
+    const trackBg = document.getElementById(`track-bg-${idx}`);
+    if (!trackBg) return;
+    const rect = trackBg.getBoundingClientRect();
+    let x = clientX - rect.left;
+    let pct = x / rect.width;
+    pct = Math.max(0, Math.min(1, pct));
+    const val = Math.round(pct * 9) + 1;
+
+    dimensions[idx][type] = val;
+
+    const marker = document.getElementById(`marker-${type}-${idx}`);
+    const label = document.getElementById(`marker-label-${type}-${idx}`);
+    if (marker) marker.style.left = (((val - 1) / 9) * 100) + '%';
+    if (label) label.textContent = type === 'cbdc' ? `CBDC (${val})` : `Stablecoin (${val})`;
+
+    updateGapBridge(idx);
+    updateHeaderValues(idx);
+    renderSummaryPanel();
+    renderStats();
+  }
+
+  function endDrag() {
+    if (dragState) {
+      const { type, idx } = dragState;
+      const marker = document.getElementById(`marker-${type}-${idx}`);
+      if (marker) marker.style.cursor = 'grab';
+    }
+    dragState = null;
+  }
+
+  document.addEventListener('mousemove', (e) => handleMove(e.clientX));
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchmove', (e) => {
+    if (dragState) e.preventDefault();
+    handleMove(e.touches[0].clientX);
+  }, {passive: false});
+  document.addEventListener('touchend', endDrag);
+
+  function updateGapBridge(idx) {
+    const dim = dimensions[idx];
+    const minV = Math.min(dim.cbdc, dim.stable);
+    const maxV = Math.max(dim.cbdc, dim.stable);
+    const diff = maxV - minV;
+    const bridge = document.getElementById(`bridge-${idx}`);
+    if (diff > 0) {
+      if (!bridge) {
+        const trackWrap = document.getElementById(`track-wrap-${idx}`);
+        const newBridge = document.createElement('div');
+        newBridge.className = 'gap-bridge';
+        newBridge.id = `bridge-${idx}`;
+        const firstMarker = document.getElementById(`marker-cbdc-${idx}`);
+        if (firstMarker) trackWrap.insertBefore(newBridge, firstMarker);
+        else trackWrap.appendChild(newBridge);
+        newBridge.style.left = (((minV - 1) / 9) * 100) + '%';
+        newBridge.style.width = ((diff / 9) * 100) + '%';
+      } else {
+        bridge.style.left = (((minV - 1) / 9) * 100) + '%';
+        bridge.style.width = ((diff / 9) * 100) + '%';
+      }
+    } else if (bridge) {
+      bridge.remove();
+    }
+  }
+
+  function updateHeaderValues(idx) {
+    const dim = dimensions[idx];
+    const block = document.getElementById('chart-panel').children[idx];
+    const header = block.querySelector('.dim-values');
+    if (header) {
+      const gap = Math.abs(dim.cbdc - dim.stable);
+      const wGap = (gap * dim.weight).toFixed(1);
+      header.innerHTML = `
+        <span class="cbdc-val">CBDC: ${dim.cbdc}</span>
+        <span class="stable-val">Stable: ${dim.stable}</span>
+        <span class="gap-val">Gap: ${gap} (w: ${wGap})</span>
+      `;
+    }
+  }
+
+  // ============================
+  // CALCULATIONS
+  // ============================
+  function calculateStats() {
+    let cbdcW = 0, stableW = 0, aggGap = 0, totalW = 0;
+    dimensions.forEach(d => {
+      cbdcW += d.cbdc * d.weight;
+      stableW += d.stable * d.weight;
+      aggGap += Math.abs(d.cbdc - d.stable) * d.weight;
+      totalW += d.weight;
+    });
+    return {
+      cbdcWeighted: cbdcW,
+      stableWeighted: stableW,
+      aggregateGap: aggGap,
+      avgGap: totalW > 0 ? aggGap / totalW : 0,
+      totalWeight: totalW,
+      maxPossible: totalW * 10,
+      maxGap: totalW * 9
+    };
+  }
+
+  // ============================
+  // SUMMARY PANEL (Visual Tracks)
+  // ============================
+  function renderSummaryPanel() {
+    const panel = document.getElementById('summary-panel');
+    panel.innerHTML = '';
+
+    const s = calculateStats();
+
+    const title = document.createElement('div');
+    title.className = 'summary-title';
+    title.textContent = 'Summary Score Visualization';
+    panel.appendChild(title);
+
+    // Row 1: CBDC Weighted Total
+    panel.appendChild(createSummaryRow(
+      'CBDC Weighted Total',
+      s.cbdcWeighted,
+      s.maxPossible,
+      'sm-cbdc',
+      '#1a3a52'
+    ));
+
+    // Row 2: Stablecoin Weighted Total
+    panel.appendChild(createSummaryRow(
+      'Stablecoin Weighted Total',
+      s.stableWeighted,
+      s.maxPossible,
+      'sm-stable',
+      '#d97706'
+    ));
+
+    // Row 3: Aggregate Weighted Gap
+    panel.appendChild(createSummaryRow(
+      'Aggregate Weighted Gap',
+      s.aggregateGap,
+      s.maxGap,
+      'sm-gap',
+      '#7c3aed'
+    ));
+
+    // Row 4: Avg Gap per Dimension
+    panel.appendChild(createSummaryRow(
+      'Avg Gap per Dimension',
+      s.avgGap,
+      9,
+      'sm-avg',
+      '#059669'
+    ));
+  }
+
+  function createSummaryRow(label, value, max, markerClass, color) {
+    const row = document.createElement('div');
+    row.className = 'summary-row';
+
+    const lbl = document.createElement('div');
+    lbl.className = 'summary-label';
+    lbl.textContent = label;
+    row.appendChild(lbl);
+
+    const trackWrap = document.createElement('div');
+    trackWrap.className = 'summary-track-wrap';
+
+    // Track background with ticks
+    let trackHTML = '<div class="summary-track-bg">';
+    const steps = max <= 10 ? Math.ceil(max) : 10;
+    for (let i = 0; i <= steps; i++) {
+      const pct = (i / steps) * 100;
+      const tickVal = (max * (i / steps)).toFixed(i === 0 ? 0 : (max <= 10 ? 0 : 1));
+      trackHTML += `<div class="summary-tick" style="left:${pct}%"></div>`;
+      if (i % Math.max(1, Math.floor(steps / 5)) === 0 || i === steps) {
+        trackHTML += `<div class="summary-tick-label" style="left:${pct}%">${tickVal}</div>`;
+      }
+    }
+    trackHTML += '</div>';
+    trackWrap.innerHTML = trackHTML;
+
+    // Marker
+    const pct = Math.min(100, (value / max) * 100);
+    const marker = document.createElement('div');
+    marker.className = `summary-marker ${markerClass}`;
+    marker.style.left = pct + '%';
+
+    const mLabel = document.createElement('span');
+    mLabel.className = 'summary-marker-label';
+    mLabel.style.color = color;
+    mLabel.textContent = value.toFixed(2);
+    marker.appendChild(mLabel);
+
+    trackWrap.appendChild(marker);
+    row.appendChild(trackWrap);
+
+    return row;
+  }
+
+  // ============================
+  // STATS GRID (Numeric Cards)
+  // ============================
+  function renderStats() {
+    const s = calculateStats();
+    const grid = document.getElementById('stats-grid');
+    grid.innerHTML = '';
+    const cards = [
+      { label: 'CBDC Weighted Total', value: s.cbdcWeighted.toFixed(1), color: 'var(--cbdc-color)' },
+      { label: 'Stablecoin Weighted Total', value: s.stableWeighted.toFixed(1), color: 'var(--stable-color)' },
+      { label: 'Aggregate Weighted Gap', value: s.aggregateGap.toFixed(1), color: '#7c3aed' },
+      { label: 'Avg Gap per Dimension', value: s.avgGap.toFixed(2), color: '#059669' }
+    ];
+    cards.forEach(c => {
+      const card = document.createElement('div');
+      card.className = 'stat-card';
+      card.innerHTML = `
+        <div class="stat-value" style="color:${c.color}">${c.value}</div>
+        <div class="stat-label">${c.label}</div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  // ============================
+  // INIT
+  // ============================
+  function renderAll() {
+    renderChartPanel();
+    renderSummaryPanel();
+    renderStats();
+  }
+
+  renderWeights();
+  renderAll();
+</script>
+</body>
+</html>
